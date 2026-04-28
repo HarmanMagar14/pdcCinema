@@ -1,60 +1,82 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Cinema Project - Admin & System Documentation
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+This document provides a comprehensive guide to the administrative functionalities of the Cinema Project and outlines known system issues that require attention.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## **Admin Functionality: Movie Management**
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+The admin panel allows authorized users to manage the movie catalog, including uploading new movies and scheduling showtimes.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### **How to Upload a Movie**
 
-## Learning Laravel
+Follow these steps to add a new movie to the system:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+1.  **Access the Admin Panel**: Log in with an administrator account and navigate to the **Movies** section from the sidebar.
+2.  **Initiate Creation**: Click the **"Add Movie"** or **"Create New Movie"** button.
+3.  **Fill Movie Details**:
+    *   **Title**: Enter the full title of the movie (Max 255 characters).
+    *   **Genre**: Select the appropriate genre from the dropdown list.
+    *   **Release Date**: Specify the official release date.
+    *   **Duration**: Enter the movie length in minutes (e.g., 120).
+    *   **Description**: Provide a detailed synopsis of the movie.
+    *   **YouTube Trailer Link**: (Optional) Paste the full YouTube URL for the movie trailer.
+4.  **Upload Poster**:
+    *   Select an image file (JPG, PNG, GIF, or WebP).
+    *   **Validation**: The file must not exceed **2MB**.
+5.  **Configure Cinema & Showtimes**:
+    *   **Select Cinemas**: Check the boxes for the cinemas where this movie will be shown.
+    *   **Add Showtimes**: Click **"Add Showtime"** to create scheduling rows.
+    *   **Hall Selection**: Select a cinema first, then choose an available hall within that cinema.
+    *   **Start Time**: Set the date and time for the screening.
+    *   **Price**: Set the ticket price for that specific showtime.
+6.  **Save**: Click **"Save Movie"** to finalize the upload.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### **Technical Process Flow**
+- **Validation**: The system validates all required fields and file constraints.
+- **Storage**: The poster image is stored in the `public/posters` directory.
+- **Calculation**: Screening end times are automatically calculated by adding the **Duration** to the **Start Time**.
+- **Legacy Support**: The first created showtime ID is linked directly to the movie record for backward compatibility.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## **Known Issues**
 
-### Premium Partners
+The following issues have been identified and are prioritized for future fixes:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### **1. Cinema & Showtimes Module**
+*   **Status**: ⚠️ Buggy / Not Functioning Correctly
+*   **Details**: The dynamic association between movies, cinemas, and halls during the upload/edit process is inconsistent. 
+*   **Technical Notes**: 
+    - The JavaScript logic in [form.blade.php](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/resources/views/admin/movies/form.blade.php) responsible for fetching halls via API may fail or conflict with the `cinema-checkbox` selection.
+    - Updating a movie currently deletes all existing showtimes and recreates them, which may cause data integrity issues with existing bookings.
 
-## Contributing
+### **2. Analytics Dashboard**
+*   **Status**: ⚠️ Static Data
+*   **Details**: The analytics dashboard currently displays placeholder/randomized data instead of real-time system metrics.
+*   **Technical Notes**: 
+    - The [analytics.blade.php](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/resources/views/admin/analytics.blade.php) file uses `Math.random()` and hardcoded arrays in its Chart.js initialization.
+    - There is a duplicate `analytics()` method in [AdminController.php](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/app/Http/Controllers/Admin/AdminController.php) (Line 212) that returns the view without passing the calculated KPI data.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### **3. UI/UX Improvements**
+*   **Status**: ⚠️ Ongoing
+*   **Details**: Multiple pages throughout the application require design refinements to improve consistency, accessibility, and user flow.
+*   **Target Areas**: Dashboard layout, form spacing, and mobile responsiveness.
 
-## Code of Conduct
+### **4. PayMongo Payment Integration**
+*   **Status**: ⚠️ Redirection Bug
+*   **Details**: Upon successful payment via PayMongo, users are not consistently redirected to their ticket confirmation page. Instead, they may remain on the payment interface or a generic success page.
+*   **Technical Notes**: 
+    - The `success_url` passed to PayMongo in [BookingsController.php](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/app/Http/Controllers/BookingsController.php) (Line 133) needs verification.
+    - Ensure the `paymentSuccess` method correctly handles the transition to the [bookings.show](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/resources/views/bookings/show.blade.php) view with a clear "Success" state.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+---
 
-## Security Vulnerabilities
+## **Developer Resources**
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+*   **Database Schema**: See [migrations](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/database/migrations) for table structures.
+*   **Service Layer**: PayMongo logic is encapsulated in [PayMongoService.php](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/app/Services/PayMongoService.php).
+*   **Routes**: Admin routes are defined in the `admin` prefix group within [web.php](file:///c:/xampp/htdocs/Cinema-Project/Cinema-Project-PDC03-main/routes/web.php).
 
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
-"# pdc_cinema" 
+---
+*Last Updated: 2026-04-28*
