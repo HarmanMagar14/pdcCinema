@@ -355,11 +355,51 @@ class AdminController extends Controller
     // MOVIES - CREATE VIEW
     public function createMovie()
     {
-        $genres = Genres::all();
+        $genres  = Genres::all();
         $cinemas = Cinemas::with('halls')->get();
-        $showtimes = Showtimes::with('hall.cinema')->get();
-        return view('admin.movies.form', compact('genres', 'cinemas', 'showtimes'));
+    
+        // Embed ALL future showtimes as a flat JSON-friendly array.
+        // The Blade view will pass this to JavaScript — no API call needed.
+        $allShowtimes = Showtimes::with('movie:id,title')
+            ->where('start_time', '>=', now())
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn($st) => [
+                'hall_id'    => $st->hall_id,
+                'movie'      => $st->movie->title ?? 'Unknown',
+                'start_time' => $st->start_time->format('Y-m-d H:i'),
+                'end_time'   => $st->end_time->format('Y-m-d H:i'),
+                'start_ts'   => $st->start_time->timestamp,
+                'end_ts'     => $st->end_time->timestamp,
+            ]);
+    
+        return view('admin.movies.form', compact('genres', 'cinemas', 'allShowtimes'));
     }
+
+
+    private function hasConflict(
+    int $hallId,
+    string $startTime,
+    int $durationMinutes,
+    ?int $excludeId = null
+    ): bool {
+        $start = Carbon::parse($startTime);
+        $end   = $start->copy()->addMinutes($durationMinutes);
+    
+        $query = Showtimes::where('hall_id', $hallId)
+            ->where(function ($q) use ($start, $end) {
+                // Standard interval overlap: A.start < B.end  AND  A.end > B.start
+                $q->where('start_time', '<', $end)
+                ->where('end_time',   '>', $start);
+            });
+    
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+    
+        return $query->exists();
+    }
+
 
     // MOVIES - STORE
     public function storeMovie(Request $request)
@@ -377,6 +417,24 @@ class AdminController extends Controller
             'showtimes.*.start_time' => 'required|date',
             'showtimes.*.price' => 'required|numeric|min:0',
         ]);
+
+                // ── Conflict check (add after $validated = ...) ───────────────────────
+        foreach ($request->showtimes as $index => $stData) {
+            if ($this->hasConflict(
+                (int) $stData['hall_id'],
+                $stData['start_time'],
+                (int) $validated['duration']
+            )) {
+                $hall = \App\Models\Halls::find($stData['hall_id']);
+                return back()->withInput()->withErrors([
+                    "showtimes.{$index}.start_time" =>
+                        'Hall "' . ($hall->name ?? 'selected') .
+                        '" is already booked during this time. Choose a different time or hall.',
+                ]);
+            }
+        }
+        // ── End conflict check ────────────────────────────────────────────────
+
 
         $movie = new Movies();
         $movie->title = $validated['title'];
@@ -418,10 +476,28 @@ class AdminController extends Controller
     public function editMovie(Movies $movie)
     {
         $movie->load('showtimes.hall.cinema');
-        $genres = Genres::all();
+        $genres  = Genres::all();
         $cinemas = Cinemas::with('halls')->get();
-        return view('admin.movies.form', compact('movie', 'genres', 'cinemas'));
+    
+        // Same flat array as createMovie — exclude this movie's own
+        // showtimes so they don't show as conflicts against themselves.
+        $allShowtimes = Showtimes::with('movie:id,title')
+            ->where('movie_id', '!=', $movie->id)   // <-- exclude self
+            ->where('start_time', '>=', now())
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn($st) => [
+                'hall_id'    => $st->hall_id,
+                'movie'      => $st->movie->title ?? 'Unknown',
+                'start_time' => $st->start_time->format('Y-m-d H:i'),
+                'end_time'   => $st->end_time->format('Y-m-d H:i'),
+                'start_ts'   => $st->start_time->timestamp,
+                'end_ts'     => $st->end_time->timestamp,
+            ]);
+    
+        return view('admin.movies.form', compact('movie', 'genres', 'cinemas', 'allShowtimes'));
     }
+
 
     // MOVIES - UPDATE
     public function updateMovie(Request $request, Movies $movie)
@@ -440,6 +516,28 @@ class AdminController extends Controller
             'showtimes.*.start_time' => 'required|date',
             'showtimes.*.price' => 'required|numeric|min:0',
         ]);
+        // ── Conflict check (add after $validated = ...) ───────────────────────
+        foreach ($request->showtimes as $index => $stData) {
+            $excludeId = !empty($stData['id']) ? (int) $stData['id'] : null;
+        
+            if ($this->hasConflict(
+                (int) $stData['hall_id'],
+                $stData['start_time'],
+                (int) $validated['duration'],
+                $excludeId
+            )) {
+                $hall = \App\Models\Halls::find($stData['hall_id']);
+                return back()->withInput()->withErrors([
+                    "showtimes.{$index}.start_time" =>
+                        'Hall "' . ($hall->name ?? 'selected') .
+                        '" is already booked during this time. Choose a different time or hall.',
+                ]);
+            }
+        }
+
+        // ── End conflict check ────────────────────────────────────────────────
+
+
 
         $movie->title = $validated['title'];
         $movie->description = $validated['description'];
