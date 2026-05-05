@@ -49,6 +49,8 @@ Route::post('bookings/{booking}/cancel', [BookingsController::class, 'cancel'])-
 Route::post('/webhooks/paymongo', [PayMongoWebhookController::class, 'handle'])->withoutMiddleware(['web']);
 
 // Auth routes
+Route::get('/otp',    [AuthController::class, 'showOtp'])->name('otp.show');
+Route::post('/otp',   [AuthController::class, 'verifyOtp'])->name('otp.verify');
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');

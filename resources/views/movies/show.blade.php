@@ -486,6 +486,11 @@
                     {{ session('success') }}
                 </div>
             @endif
+            @if(session('error'))
+                <div class="alert alert-danger text-dark" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
             @if($errors->any())
                 <div class="alert alert-danger text-dark" role="alert">
                     {{ $errors->first() }}
@@ -493,25 +498,62 @@
             @endif
 
             @auth
-                <form method="POST" action="{{ route('movies.reviews.store', $movie) }}" class="review-form">
-                    @csrf
-                    <div>
-                        <label for="rating">Your rating</label>
-                        <select id="rating" name="rating" required>
-                            <option value="">Select rating</option>
-                            @for($i = 5; $i >= 1; $i--)
-                                <option value="{{ $i }}" {{ old('rating') == $i ? 'selected' : '' }}>{{ $i }} star{{ $i === 1 ? '' : 's' }}</option>
-                            @endfor
-                        </select>
+                @if($alreadyReviewed)
+                    {{-- User already submitted a review --}}
+                    <div style="background: rgba(40,167,69,0.12); border: 1px solid rgba(40,167,69,0.35); border-radius: 0.6rem; padding: 1.25rem 1.5rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+                        <i class="bi bi-patch-check-fill" style="color: #28a745; font-size: 1.4rem; flex-shrink:0;"></i>
+                        <div>
+                            <strong style="color: #28a745;">Review submitted</strong>
+                            <p style="margin: 0.2rem 0 0; color: var(--muted); font-size: 0.9rem;">Thank you for sharing your thoughts on this movie!</p>
+                        </div>
                     </div>
-                    <div>
-                        <label for="comment">Your review</label>
-                        <textarea id="comment" name="comment" rows="4" required>{{ old('comment') }}</textarea>
+                @elseif($canReview)
+                    {{-- Eligible — show the review form --}}
+                    <div style="background: rgba(232,52,10,0.08); border: 1px solid rgba(232,52,10,0.25); border-radius: 0.6rem; padding: 0.8rem 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem;">
+                        <i class="bi bi-star-fill" style="color: var(--gold);"></i>
+                        <span style="font-size: 0.9rem; color: var(--muted);">You've watched this movie — share your experience!</span>
                     </div>
-                    <button type="submit">Submit review</button>
-                </form>
+                    <form method="POST" action="{{ route('movies.reviews.store', $movie) }}" class="review-form">
+                        @csrf
+                        <div>
+                            <label for="rating">Your rating</label>
+                            <select id="rating" name="rating" required>
+                                <option value="">Select rating</option>
+                                @for($i = 5; $i >= 1; $i--)
+                                    <option value="{{ $i }}" {{ old('rating') == $i ? 'selected' : '' }}>{{ $i }} star{{ $i === 1 ? '' : 's' }}</option>
+                                @endfor
+                            </select>
+                        </div>
+                        <div>
+                            <label for="comment">Your review</label>
+                            <textarea id="comment" name="comment" rows="4" required>{{ old('comment') }}</textarea>
+                        </div>
+                        <button type="submit">Submit review</button>
+                    </form>
+                @elseif($reviewableAfter)
+                    {{-- Has a confirmed booking but movie hasn't ended yet --}}
+                    <div style="background: rgba(245,197,24,0.1); border: 1px solid rgba(245,197,24,0.3); border-radius: 0.6rem; padding: 1.25rem 1.5rem; display: flex; align-items: flex-start; gap: 0.75rem;">
+                        <i class="bi bi-hourglass-split" style="color: var(--gold); font-size: 1.4rem; flex-shrink:0; margin-top:0.1rem;"></i>
+                        <div>
+                            <strong style="color: var(--gold);">Review unlocks after the movie ends</strong>
+                            <p style="margin: 0.3rem 0 0; color: var(--muted); font-size: 0.9rem;">
+                                You have a confirmed booking for this movie.<br>
+                                You'll be able to write a review after
+                                <strong style="color: var(--text);">{{ \Carbon\Carbon::parse($reviewableAfter)->format('M j, Y \a\t g:i A') }}</strong>.
+                            </p>
+                        </div>
+                    </div>
+                @else
+                    {{-- Logged in but no confirmed booking --}}
+                    <div style="background: rgba(23,162,184,0.08); border: 1px solid rgba(23,162,184,0.25); border-radius: 0.6rem; padding: 1.1rem 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+                        <i class="bi bi-ticket-perforated" style="color: #17a2b8; font-size: 1.3rem; flex-shrink:0;"></i>
+                        <p style="margin: 0; color: var(--muted); font-size: 0.9rem;">
+                            You need to <strong style="color: var(--text);">book and watch this movie</strong> before you can leave a review.
+                        </p>
+                    </div>
+                @endif
             @else
-                <p style="color: var(--text);">Please <a href="{{ route('login') }}">login</a> to write a review.</p>
+                <p style="color: var(--text);">Please <a href="{{ route('login') }}">login</a> and watch the movie to write a review.</p>
             @endauth
 
             @foreach($reviews as $review)

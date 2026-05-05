@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Bookings;
 use App\Models\Cinemas;
 use App\Models\Movies;
+use App\Models\Reviews;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class MoviesController extends Controller
 {
@@ -76,6 +79,39 @@ class MoviesController extends Controller
         $averageRating = $movie->reviews()->avg('rating');
         $reviewCount = $movie->reviews()->count();
 
+        // ── Review eligibility ─────────────────────────────────────────────────────
+        $canReview      = false;
+        $alreadyReviewed = false;
+        $reviewableAfter = null; // earliest end_time for a confirmed booking (future or past)
+
+        if (Auth::check()) {
+            $userId = Auth::id();
+
+            // Has the user already reviewed this movie?
+            $alreadyReviewed = Reviews::where('user_id', $userId)
+                ->where('movie_id', $movie->id)
+                ->exists();
+
+            if (!$alreadyReviewed) {
+                // Does the user have any confirmed booking for this movie?
+                $confirmedBooking = Bookings::where('user_id', $userId)
+                    ->where('status', 'confirmed')
+                    ->whereHas('showtime', fn($q) => $q->where('movie_id', $movie->id))
+                    ->with('showtime')
+                    ->get();
+
+                if ($confirmedBooking->isNotEmpty()) {
+                    // Find the latest end_time across all their confirmed bookings for this movie
+                    $latestEndTime = $confirmedBooking
+                        ->max(fn($b) => $b->showtime->end_time);
+
+                    $reviewableAfter = $latestEndTime;
+                    $canReview = Carbon::now()->greaterThanOrEqualTo($latestEndTime);
+                }
+            }
+        }
+        // ── End review eligibility ─────────────────────────────────────────────────
+
         // Transform data for JavaScript
         $cinemaToHalls = $showtimes
             ->filter(fn($showtime) => $showtime->hall && $showtime->hall->cinema)
@@ -83,7 +119,7 @@ class MoviesController extends Controller
             ->map(function ($cinemaShowtimes) {
                 return $cinemaShowtimes
                     ->map(fn($showtime) => [
-                        'id' => $showtime->hall->id,
+                        'id'   => $showtime->hall->id,
                         'name' => $showtime->hall->name,
                     ])
                     ->unique('id')
@@ -98,7 +134,11 @@ class MoviesController extends Controller
             ->map(fn($hallShowtimes) => optional($hallShowtimes->sortBy('start_time')->first())->id)
             ->all();
 
-        return view('movies.show', compact('movie', 'showtimes', 'cinemas', 'reviews', 'averageRating', 'reviewCount', 'cinemaToHalls', 'hallToShowtime'));
+        return view('movies.show', compact(
+            'movie', 'showtimes', 'cinemas', 'reviews', 'averageRating', 'reviewCount',
+            'cinemaToHalls', 'hallToShowtime',
+            'canReview', 'alreadyReviewed', 'reviewableAfter'
+        ));
     }
 
     /**

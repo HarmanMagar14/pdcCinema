@@ -27,6 +27,8 @@ class User extends Authenticatable
         'avatar',
         'avatar_color',
         'last_seen',
+        'otp',
+        'otp_expires_at',
     ];
 
     /**
@@ -50,6 +52,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'last_seen' => 'datetime',
+            'otp_expires_at' => 'datetime',
         ];
     }
 
