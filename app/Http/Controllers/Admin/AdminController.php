@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
+
 class AdminController extends Controller
 {
     // DASHBOARD
@@ -326,6 +327,8 @@ class AdminController extends Controller
                        ->with('success', 'User deleted successfully');
     }
 
+    
+
     // MOVIES MANAGEMENT
     public function moviesList(Request $request)
     {
@@ -353,38 +356,174 @@ class AdminController extends Controller
     }
 
     // MOVIES - CREATE VIEW
+    // STEP 1 — show movie details form (no showtimes yet)
     public function createMovie()
     {
-        $genres = Genres::all();
+        $genres  = Genres::all();
+        return view('admin.movies.create', compact('genres'));
+    }
+
+    // STEP 2 — show scheduling form for an already-saved movie
+    public function showMovieShowtimes(Movies $movie)
+    {
+        $movie->load('showtimes.hall.cinema', 'genre');
         $cinemas = Cinemas::with('halls')->get();
-        $showtimes = Showtimes::with('hall.cinema')->get();
-        return view('admin.movies.form', compact('genres', 'cinemas', 'showtimes'));
+
+        $allShowtimes = Showtimes::with('movie:id,title')
+            ->where('movie_id', '!=', $movie->id)
+            ->where('start_time', '>=', now())
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn($st) => [
+                'hall_id'    => $st->hall_id,
+                'movie'      => $st->movie->title ?? 'Unknown',
+                'start_time' => $st->start_time->format('Y-m-d H:i'),
+                'end_time'   => $st->end_time->format('Y-m-d H:i'),
+                'start_ts'   => $st->start_time->timestamp,
+                'end_ts'     => $st->end_time->timestamp,
+            ]);
+
+        return view('admin.movies.showtimes', compact('movie', 'cinemas', 'allShowtimes'));
+    }
+    private function hasConflict(
+        int $hallId,
+        string $startTime,
+        int $durationMinutes,
+        ?int $excludeId = null
+    ): bool {
+        $start = Carbon::parse($startTime);
+        $end   = $start->copy()->addMinutes($durationMinutes);
+
+        $query = Showtimes::where('hall_id', $hallId)
+            ->where(function ($q) use ($start, $end) {
+                // Standard interval overlap:
+                // existing.start < new.end  AND  existing.end > new.start
+                $q->where('start_time', '<', $end)
+                ->where('end_time',   '>', $start);
+            });
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+    // STEP 2 — save/update showtimes for an existing movie
+    public function storeShowtimes(Request $request, Movies $movie)
+    {
+        $request->validate([
+            'showtimes'                  => 'required|array|min:1',
+            'showtimes.*.hall_id'        => 'required|exists:halls,id',
+            'showtimes.*.start_time'     => 'required|date',
+            'showtimes.*.price'          => 'required|numeric|min:0',
+            'showtimes.*.id'             => 'nullable|exists:showtimes,id',
+        ]);
+
+        // ── Check 1: conflicts within the submitted rows themselves ────────────
+        // This catches overlaps between two NEW rows in the same submission
+        // before anything is saved to the database.
+        $submitted = collect($request->showtimes)->map(function ($st) use ($movie) {
+            return [
+                'hall_id'  => (int) $st['hall_id'],
+                'start_ts' => Carbon::parse($st['start_time'])->timestamp,
+                'end_ts'   => Carbon::parse($st['start_time'])->addMinutes($movie->duration)->timestamp,
+                'id'       => !empty($st['id']) ? (int) $st['id'] : null,
+            ];
+        })->values();
+
+        foreach ($submitted as $i => $rowA) {
+            foreach ($submitted as $j => $rowB) {
+                if ($i >= $j) continue; // only check each pair once
+                if ($rowA['hall_id'] !== $rowB['hall_id']) continue; // different halls, no conflict
+
+                $overlaps = $rowA['start_ts'] < $rowB['end_ts']
+                         && $rowA['end_ts']   > $rowB['start_ts'];
+
+                if ($overlaps) {
+                    $hall = Halls::find($rowA['hall_id']);
+                    return back()->withInput()->withErrors([
+                        "showtimes.{$j}.start_time" =>
+                            'This showtime overlaps with another showtime you have added in the same hall ("'
+                            . ($hall->name ?? 'selected') . '"). Please space them further apart.',
+                    ]);
+                }
+            }
+        }
+
+        // ── Check 2: conflicts against existing database records ─────────────
+        // This catches overlaps against other movies already saved in the DB.
+        foreach ($request->showtimes as $index => $stData) {
+            $excludeId = !empty($stData['id']) ? (int) $stData['id'] : null;
+            if ($this->hasConflict((int) $stData['hall_id'], $stData['start_time'], $movie->duration, $excludeId)) {
+                $hall = Halls::find($stData['hall_id']);
+                return back()->withInput()->withErrors([
+                    "showtimes.{$index}.start_time" =>
+                        'Hall "' . ($hall->name ?? 'selected') . '" is already booked during this time.',
+                ]);
+            }
+        }
+
+        $keepIds = [];
+
+        foreach ($request->showtimes as $stData) {
+            if (!empty($stData['id'])) {
+                $showtime = Showtimes::find($stData['id']);
+                if ($showtime && $showtime->movie_id === $movie->id) {
+                    $showtime->hall_id    = $stData['hall_id'];
+                    $showtime->start_time = $stData['start_time'];
+                    $showtime->end_time   = Carbon::parse($stData['start_time'])->addMinutes($movie->duration);
+                    $showtime->price      = $stData['price'];
+                    $showtime->save();
+                    $keepIds[] = $showtime->id;
+                }
+            } else {
+                $showtime = Showtimes::create([
+                    'movie_id'   => $movie->id,
+                    'hall_id'    => $stData['hall_id'],
+                    'start_time' => $stData['start_time'],
+                    'end_time'   => Carbon::parse($stData['start_time'])->addMinutes($movie->duration),
+                    'price'      => $stData['price'],
+                ]);
+                $keepIds[] = $showtime->id;
+            }
+        }
+
+        // Delete removed showtimes
+        Showtimes::where('movie_id', $movie->id)
+            ->whereNotIn('id', $keepIds)
+            ->delete();
+
+        // Keep legacy show_time_id in sync
+        if (!$movie->show_time_id && !empty($keepIds)) {
+            $movie->show_time_id = $keepIds[0];
+            $movie->save();
+        }
+
+        return redirect()->route('admin.movies.index')
+            ->with('success', 'Showtimes saved for "' . $movie->title . '".');
     }
 
     // MOVIES - STORE
+    // STEP 1 - save movie details only, then redirect to scheduling
     public function storeMovie(Request $request)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'genre_id' => 'required|exists:genres,id',
+            'title'        => 'required|string|max:255',
+            'description'  => 'required|string',
+            'genre_id'     => 'required|exists:genres,id',
             'release_date' => 'required|date',
-            'duration' => 'required|integer|min:1',
-            'poster' => 'nullable|image|max:2048',
-            'trailer_url' => 'nullable|url|max:255',
-            'showtimes' => 'required|array|min:1',
-            'showtimes.*.hall_id' => 'required|exists:halls,id',
-            'showtimes.*.start_time' => 'required|date',
-            'showtimes.*.price' => 'required|numeric|min:0',
+            'duration'     => 'required|integer|min:1',
+                'poster'       => 'nullable|image|max:2048',
+            'trailer_url'  => 'nullable|url|max:255',
         ]);
 
         $movie = new Movies();
-        $movie->title = $validated['title'];
-        $movie->description = $validated['description'];
-        $movie->genre_id = $validated['genre_id'];
+        $movie->title        = $validated['title'];
+        $movie->description  = $validated['description'];
+        $movie->genre_id     = $validated['genre_id'];
         $movie->release_date = $validated['release_date'];
-        $movie->duration = $validated['duration'];
-        $movie->trailer_url = $validated['trailer_url'] ?? null;
+        $movie->duration     = $validated['duration'];
+            $movie->trailer_url  = $validated['trailer_url'] ?? null;
 
         if ($request->hasFile('poster')) {
             $movie->poster = $request->file('poster')->store('posters', 'public');
@@ -392,35 +531,15 @@ class AdminController extends Controller
 
         $movie->save();
 
-        // Save showtimes
-        foreach ($request->showtimes as $stData) {
-            $showtime = new Showtimes();
-            $showtime->movie_id = $movie->id;
-            $showtime->hall_id = $stData['hall_id'];
-            $showtime->start_time = $stData['start_time'];
-            $showtime->price = $stData['price'];
-            // End time calculation (start time + duration)
-            $showtime->end_time = Carbon::parse($stData['start_time'])->addMinutes($movie->duration);
-            $showtime->save();
-
-            // Optionally update the first showtime ID to the movie record for legacy support
-            if (!$movie->show_time_id) {
-                $movie->show_time_id = $showtime->id;
-                $movie->save();
-            }
-        }
-        
-        return redirect()->route('admin.movies.index')
-                       ->with('success', 'Movie and showtimes created successfully');
+        return redirect()->route('admin.movies.showtimes', $movie)
+            ->with('success', 'Movie details saved. Now add your showtimes below.');
     }
 
-    // MOVIES - EDIT VIEW
+    // MOVIES - EDIT VIEW (details only)
     public function editMovie(Movies $movie)
     {
-        $movie->load('showtimes.hall.cinema');
         $genres = Genres::all();
-        $cinemas = Cinemas::with('halls')->get();
-        return view('admin.movies.form', compact('movie', 'genres', 'cinemas'));
+        return view('admin.movies.edit', compact('movie', 'genres'));
     }
 
     // MOVIES - UPDATE

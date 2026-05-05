@@ -196,6 +196,7 @@
                             <th style="width:20%;">Hall</th>
                             <th style="width:28%;">Start Time</th>
                             <th style="width:14%;">Price (₱)</th>
+                            <th style="width:20%;">Hall Schedule</th>
                             <th style="width:10%;text-align:center;">Action</th>
                         </tr>
                     </thead>
@@ -203,9 +204,9 @@
                         @if(isset($movie) && $movie->showtimes->count() > 0)
                             @foreach($movie->showtimes as $index => $st)
                                 <tr class="showtime-row">
-                                    <input type="hidden" name="showtimes[{{ $index }}][id]" value="{{ $st->id }}">
-                                    <td>
-                                        <select name="showtimes[{{ $index }}][cinema_id]"
+                                        <td>
+                                            <input type="hidden" name="showtimes[{{ $index }}][id]" value="{{ $st->id }}">
+                                            <select name="showtimes[{{ $index }}][cinema_id]"
                                                 class="form-select form-select-sm row-cinema-select" required>
                                             <option value="">Select Cinema</option>
                                             @foreach($cinemas as $cinema)
@@ -224,15 +225,29 @@
                                     <td>
                                         <input type="datetime-local"
                                                name="showtimes[{{ $index }}][start_time]"
-                                               class="form-control form-control-sm"
+                                               class="form-control form-control-sm showtime-dt"
                                                value="{{ $st->start_time->format('Y-m-d\TH:i') }}" required>
+                                            @error('showtimes.' . $index . '.start_time')
+                                                <div style="color:#ff6b6b;font-size:0.75rem;margin-top:4px;">
+                                                    <i class="bi bi-exclamation-circle"></i> {{ $message }}
+                                                </div>
+                                            @enderror
                                     </td>
+
                                     <td>
                                         <input type="number"
                                                name="showtimes[{{ $index }}][price]"
                                                class="form-control form-control-sm"
                                                value="{{ $st->price }}"
                                                step="0.01" min="0" required>
+                                    </td>
+
+                                    <td>
+                                        <div class="avail-panel"
+                                            style="font-size:0.72rem;color:rgba(240,239,244,0.45);
+                                                    min-height:36px;padding:4px 2px;">
+                                            <span class="avail-text">—</span>
+                                        </div>
                                     </td>
                                     <td class="text-center">
                                         <button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove">
@@ -267,117 +282,196 @@
 
 @push('scripts')
 <script>
-    // Poster preview
-    function previewPoster(input) {
-        const preview = document.getElementById('poster-preview');
-        const placeholder = document.getElementById('poster-placeholder');
-        const label = document.getElementById('file-label');
+const ALL_SHOWTIMES = @json($allShowtimes);
 
-        if (input.files && input.files[0]) {
-            const file = input.files[0];
-            label.textContent = file.name;
-
-            const reader = new FileReader();
-            reader.onload = e => {
-                preview.src = e.target.result;
-                preview.style.display = 'block';
-                if (placeholder) placeholder.style.display = 'none';
-            };
-            reader.readAsDataURL(file);
-        }
+function previewPoster(input) {
+    const preview     = document.getElementById('poster-preview');
+    const placeholder = document.getElementById('poster-placeholder');
+    const label       = document.getElementById('file-label');
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        label.textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = e => {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
     }
-
-    document.addEventListener('DOMContentLoaded', function () {
-        const showtimesBody = document.getElementById('showtimes-body');
-        const addBtn        = document.getElementById('add-showtime');
-        const noMsg         = document.getElementById('no-showtimes-msg');
-        let rowCount = {{ isset($movie) ? $movie->showtimes->count() : 0 }};
-
-        const cinemasData       = @json($cinemas);
-        const hallsUrlTemplate  = "{{ route('admin.api.cinemas.halls', ['cinema' => ':id']) }}";
-
-        function toggleNoMsg() {
-            noMsg.style.display = showtimesBody.children.length === 0 ? 'block' : 'none';
-        }
-
-        // Wire up existing rows
-        document.querySelectorAll('.showtime-row').forEach(row => {
-            wireRow(row);
-        });
-
-        addBtn.addEventListener('click', function () {
-            const index = rowCount++;
-            const tr = document.createElement('tr');
-            tr.className = 'showtime-row';
-
-            let cinemaOptions = '<option value="">Select Cinema</option>';
-            cinemasData.forEach(c => {
-                cinemaOptions += `<option value="${c.id}">${c.name}</option>`;
-            });
-
-            tr.innerHTML = `
-                <input type="hidden" name="showtimes[${index}][id]" value="">
-                <td>
-                    <select name="showtimes[${index}][cinema_id]" class="form-select form-select-sm row-cinema-select" required>
-                        ${cinemaOptions}
-                    </select>
-                </td>
-                <td>
-                    <select name="showtimes[${index}][hall_id]" class="form-select form-select-sm row-hall-select" required>
-                        <option value="">Select Cinema First</option>
-                    </select>
-                </td>
-                <td>
-                    <input type="datetime-local" name="showtimes[${index}][start_time]" class="form-control form-control-sm" required>
-                </td>
-                <td>
-                    <input type="number" name="showtimes[${index}][price]" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00" required>
-                </td>
-                <td class="text-center">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </td>
-            `;
-
-            showtimesBody.appendChild(tr);
-            wireRow(tr);
-            toggleNoMsg();
-        });
-
-        function wireRow(row) {
-            const cinemaSelect = row.querySelector('.row-cinema-select');
-            const hallSelect   = row.querySelector('.row-hall-select');
-
-            cinemaSelect.addEventListener('change', function () {
-                fetchHalls(this.value, hallSelect);
-            });
-
-            row.querySelector('.remove-row').addEventListener('click', function () {
-                row.remove();
-                toggleNoMsg();
-            });
-        }
-
-        function fetchHalls(cinemaId, selectElement) {
-            if (!cinemaId) {
-                selectElement.innerHTML = '<option value="">Select Cinema First</option>';
-                return;
-            }
-            const url = hallsUrlTemplate.replace(':id', cinemaId);
-            selectElement.innerHTML = '<option value="">Loading halls…</option>';
-            fetch(url)
-                .then(r => r.json())
-                .then(halls => {
-                    selectElement.innerHTML = '<option value="">Select Hall</option>';
-                    halls.forEach(h => {
-                        selectElement.innerHTML += `<option value="${h.id}">${h.name}</option>`;
-                    });
-                })
-                .catch(() => {
-                    selectElement.innerHTML = '<option value="">Error loading halls</option>';
-                });
-        }
+}
+ 
+document.addEventListener('DOMContentLoaded', function () {
+ 
+    const showtimesBody = document.getElementById('showtimes-body');
+    const addBtn        = document.getElementById('add-showtime');
+    const noMsg         = document.getElementById('no-showtimes-msg');
+    const durationInput = document.getElementById('duration');
+    let rowCount = {{ isset($movie) ? $movie->showtimes->count() : 0 }};
+ 
+    const cinemasData = @json($cinemas);
+    const hallsUrl    = "{{ route('admin.api.cinemas.halls', ['cinema' => ':id']) }}";
+ 
+    function toggleNoMsg() {
+        noMsg.style.display = showtimesBody.children.length === 0 ? 'block' : 'none';
+    }
+ 
+    document.querySelectorAll('.showtime-row').forEach(row => {
+        wireRow(row);
+        refreshAvailability(row);
     });
+ 
+    addBtn.addEventListener('click', function () {
+        const index = rowCount++;
+        const tr    = document.createElement('tr');
+        tr.className = 'showtime-row';
+ 
+        let cinemaOptions = '<option value="">Select Cinema</option>';
+        cinemasData.forEach(c => {
+            cinemaOptions += `<option value="${c.id}">${c.name}</option>`;
+        });
+ 
+        tr.innerHTML = `
+            <td>
+                <input type="hidden" name="showtimes[${index}][id]" value="">
+                <select name="showtimes[${index}][cinema_id]"
+                        class="form-select form-select-sm row-cinema-select" required>
+                    ${cinemaOptions}
+                </select>
+            </td>
+            <td>
+                <select name="showtimes[${index}][hall_id]"
+                        class="form-select form-select-sm row-hall-select" required>
+                    <option value="">Select Cinema First</option>
+                </select>
+            </td>
+            <td>
+                <input type="datetime-local"
+                       name="showtimes[${index}][start_time]"
+                       class="form-control form-control-sm showtime-dt" required>
+            </td>
+            <td>
+                <input type="number" name="showtimes[${index}][price]"
+                       class="form-control form-control-sm"
+                       step="0.01" min="0" placeholder="0.00" required>
+            </td>
+            <td>
+                <div class="avail-panel"
+                     style="font-size:0.72rem;color:rgba(240,239,244,0.45);
+                            min-height:36px;padding:4px 2px;">
+                    <span class="avail-text">—</span>
+                </div>
+            </td>
+            <td class="text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-row">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>`;
+ 
+        showtimesBody.appendChild(tr);
+        wireRow(tr);
+        toggleNoMsg();
+    });
+ 
+    function wireRow(row) {
+        const cinemaSelect = row.querySelector('.row-cinema-select');
+        const hallSelect   = row.querySelector('.row-hall-select');
+        const dtInput      = row.querySelector('.showtime-dt');
+        const removeBtn    = row.querySelector('.remove-row');
+ 
+        cinemaSelect.addEventListener('change', function () {
+            fetchHalls(this.value, hallSelect, () => refreshAvailability(row));
+        });
+ 
+        hallSelect.addEventListener('change', () => refreshAvailability(row));
+ 
+        dtInput.addEventListener('change', () => refreshAvailability(row));
+ 
+        durationInput.addEventListener('change', () => {
+            document.querySelectorAll('.showtime-row').forEach(r => refreshAvailability(r));
+        });
+ 
+        removeBtn.addEventListener('click', () => { row.remove(); toggleNoMsg(); });
+    }
+ 
+    function fetchHalls(cinemaId, selectElement, callback) {
+        if (!cinemaId) {
+            selectElement.innerHTML = '<option value="">Select Cinema First</option>';
+            return;
+        }
+        const url = hallsUrl.replace(':id', cinemaId);
+        selectElement.innerHTML = '<option value="">Loading halls…</option>';
+        fetch(url)
+            .then(r => r.json())
+            .then(halls => {
+                selectElement.innerHTML = '<option value="">Select Hall</option>';
+                halls.forEach(h => {
+                    selectElement.innerHTML +=
+                        `<option value="${h.id}">${h.name}</option>`;
+                });
+                if (callback) callback();
+            })
+            .catch(() => {
+                selectElement.innerHTML = '<option value="">Error loading halls</option>';
+            });
+    }
+ 
+    function refreshAvailability(row) {
+        const hallSelect = row.querySelector('.row-hall-select');
+        const dtInput    = row.querySelector('.showtime-dt');
+        const panel      = row.querySelector('.avail-panel');
+        if (!panel) return;
+ 
+        const hallId = hallSelect ? parseInt(hallSelect.value) : null;
+        const dtVal  = dtInput ? dtInput.value : null; 
+ 
+        if (!hallId || !dtVal) {
+            panel.innerHTML =
+                '<span style="color:rgba(240,239,244,0.3);">Select a hall and time</span>';
+            return;
+        }
+ 
+        const datePart   = dtVal.split('T')[0];
+ 
+        const daySlots = ALL_SHOWTIMES.filter(s =>
+            s.hall_id === hallId &&
+            s.start_time.startsWith(datePart)
+        );
+ 
+        panel.innerHTML = renderAvailability(daySlots, dtVal);
+    }
+ 
+
+    function renderAvailability(slots, currentDt) {
+        if (slots.length === 0) {
+            return '<span style="color:#4add8a;font-weight:600;">' +
+                   '<i class="bi bi-check-circle-fill"></i> Free all day</span>';
+        }
+ 
+        const durationMins = parseInt(durationInput.value) || 0;
+        const newStart     = Math.floor(new Date(currentDt).getTime() / 1000);
+        const newEnd       = newStart + durationMins * 60;
+ 
+        let html = '<div style="font-weight:600;margin-bottom:3px;' +
+                   'color:rgba(240,239,244,0.6);">Booked:</div>';
+ 
+        slots.forEach(slot => {
+            // Overlap: new.start < slot.end  AND  new.end > slot.start
+            const overlaps = (newStart < slot.end_ts) && (newEnd > slot.start_ts);
+            const color    = overlaps ? '#ff6b6b' : 'rgba(240,239,244,0.5)';
+            const icon     = overlaps ? '⚠ ' : '· ';
+            const time     = slot.start_time.slice(11,16) + '–' + slot.end_time.slice(11,16);
+            html += `<div style="color:${color};line-height:1.6;">
+                        ${icon}${time}
+                        <span style="opacity:0.55;">${slot.movie}</span>
+                     </div>`;
+        });
+ 
+        return html;
+    }
+ 
+    toggleNoMsg();
+});
+
 </script>
 @endpush

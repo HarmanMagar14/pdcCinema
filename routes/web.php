@@ -78,6 +78,9 @@ Route::middleware(['auth', 'is_admin'])->prefix('admin')->name('admin.')->group(
     Route::get('/movies/{movie}/edit', [AdminController::class, 'editMovie'])->name('movies.edit');
     Route::put('/movies/{movie}', [AdminController::class, 'updateMovie'])->name('movies.update');
     Route::delete('/movies/{movie}', [AdminController::class, 'deleteMovie'])->name('movies.destroy');
+    Route::get('/movies/{movie}/showtimes',  [AdminController::class, 'showMovieShowtimes'])->name('movies.showtimes');
+    Route::post('/movies/{movie}/showtimes', [AdminController::class, 'storeShowtimes'])->name('movies.showtimes.store');
+
     
     // Cinemas Management
     Route::get('/cinemas', [AdminController::class, 'cinemasList'])->name('cinemas.index');

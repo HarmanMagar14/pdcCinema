@@ -58,6 +58,22 @@ class BookingsController extends Controller
 
         $showtime = Showtimes::findOrFail($request->showtime_id);
 
+        // ── Overlap check ────────────────────────────────────────────────────────────
+        // Prevent booking a showtime that overlaps another one already running
+        // in the same hall at the same time.
+        $overlap = Showtimes::where('hall_id', $showtime->hall_id)
+            ->where('id', '!=', $showtime->id)
+            ->where('start_time', '<', $showtime->end_time)
+            ->where('end_time',   '>', $showtime->start_time)
+            ->exists();
+
+        if ($overlap) {
+            return back()->withErrors([
+                'showtime_id' => 'This screening overlaps another scheduled movie in the same hall. Please choose a different showtime.'
+            ]);
+        }
+        // ── End overlap check ────────────────────────────────────────────────────────
+
         // Check if any selected seats are already booked for this showtime
         $bookedSeats = Bookings_seats::whereIn('seat_id', $request->seats)
             ->whereHas('booking', function ($query) use ($request) {
