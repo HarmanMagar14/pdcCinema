@@ -2,6 +2,48 @@
 
 @section('title', isset($cinema) ? 'Edit Cinema' : 'Create Cinema')
 
+@section('styles')
+<style>
+    /* ── Dark-theme modal overrides ── */
+    .modal-content {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 0.75rem !important;
+        color: var(--text) !important;
+    }
+    .modal-header {
+        background: var(--surface2) !important;
+        border-bottom: 1px solid var(--border) !important;
+        border-radius: 0.75rem 0.75rem 0 0 !important;
+    }
+    .modal-title { color: var(--text) !important; font-weight: 600; }
+    .modal-footer {
+        background: var(--surface2) !important;
+        border-top: 1px solid var(--border) !important;
+        border-radius: 0 0 0.75rem 0.75rem !important;
+    }
+    .modal-body { background: var(--surface) !important; }
+    .modal .form-control,
+    .modal .form-select {
+        background: var(--surface2) !important;
+        border: 1px solid rgba(240,239,244,0.12) !important;
+        color: var(--text) !important;
+    }
+    .modal .form-control:focus,
+    .modal .form-select:focus {
+        border-color: rgba(232,52,10,0.5) !important;
+        box-shadow: 0 0 0 3px rgba(232,52,10,0.1) !important;
+    }
+    .modal .form-control::placeholder { color: var(--muted) !important; }
+    .modal .form-label { color: var(--muted) !important; }
+    .modal .form-select option {
+        background: #1c1c21;
+        color: #f0eff4;
+    }
+    .btn-close { filter: invert(1) opacity(0.6) !important; }
+</style>
+@endsection
+
 @section('breadcrumb')
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -152,11 +194,11 @@
                         <div class="row g-3">
                             <div class="col-md-12">
                                 <label class="form-label">Hall Name</label>
-                                <input type="text" name="name" class="form-control" required>
+                                <input type="text" name="name" class="form-control" required placeholder="e.g. Hall 1">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Capacity (Seats)</label>
-                                <input type="number" name="capacity" class="form-control" required min="1">
+                                <input type="number" name="capacity" class="form-control" required min="1" max="500" placeholder="20">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Projection Type</label>
@@ -165,14 +207,6 @@
                                     <option value="3D">3D</option>
                                     <option value="IMAX">IMAX</option>
                                 </select>
-                            </div>
-                            <div class="col-md-12">
-                                <label class="form-label">Screen Type</label>
-                                <input type="text" name="screen_type" class="form-control">
-                            </div>
-                            <div class="col-md-12">
-                                <label class="form-label">Audio System</label>
-                                <input type="text" name="audio_system" class="form-control">
                             </div>
                         </div>
                     </div>
@@ -200,11 +234,12 @@
                         <div class="row g-3">
                             <div class="col-md-12">
                                 <label class="form-label">Hall Name</label>
-                                <input type="text" name="name" id="edit_name" class="form-control" required>
+                                <input type="text" name="name" id="edit_name" class="form-control" required placeholder="e.g. Hall 1">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Capacity (Seats)</label>
-                                <input type="number" name="capacity" id="edit_capacity" class="form-control" required min="1">
+                                <input type="number" name="capacity" id="edit_capacity" class="form-control" required min="1" max="500">
+                                <div class="form-text" style="color: rgba(240,239,244,0.35); font-size:0.78rem;">Changing capacity will regenerate all seats.</div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Projection Type</label>
@@ -213,14 +248,6 @@
                                     <option value="3D">3D</option>
                                     <option value="IMAX">IMAX</option>
                                 </select>
-                            </div>
-                            <div class="col-md-12">
-                                <label class="form-label">Screen Type</label>
-                                <input type="text" name="screen_type" id="edit_screen_type" class="form-control">
-                            </div>
-                            <div class="col-md-12">
-                                <label class="form-label">Audio System</label>
-                                <input type="text" name="audio_system" id="edit_audio_system" class="form-control">
                             </div>
                         </div>
                     </div>
@@ -246,8 +273,6 @@
                     document.getElementById('edit_name').value = hall.name;
                     document.getElementById('edit_capacity').value = hall.capacity;
                     document.getElementById('edit_projection_type').value = hall.projection_type;
-                    document.getElementById('edit_screen_type').value = hall.screen_type || '';
-                    document.getElementById('edit_audio_system').value = hall.audio_system || '';
                 });
             });
         });

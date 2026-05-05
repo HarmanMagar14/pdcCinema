@@ -93,20 +93,34 @@ class MoviesController extends Controller
                 ->exists();
 
             if (!$alreadyReviewed) {
-                // Does the user have any confirmed booking for this movie?
-                $confirmedBooking = Bookings::where('user_id', $userId)
+                // Find user's confirmed bookings for this movie where the showtime has ALREADY ENDED
+                $eligibleBookings = Bookings::where('user_id', $userId)
                     ->where('status', 'confirmed')
-                    ->whereHas('showtime', fn($q) => $q->where('movie_id', $movie->id))
+                    ->whereHas('showtime', function ($q) use ($movie) {
+                        $q->where('movie_id', $movie->id)
+                          ->where('end_time', '<=', Carbon::now()); // showtime must have ended
+                    })
                     ->with('showtime')
                     ->get();
 
-                if ($confirmedBooking->isNotEmpty()) {
-                    // Find the latest end_time across all their confirmed bookings for this movie
-                    $latestEndTime = $confirmedBooking
-                        ->max(fn($b) => $b->showtime->end_time);
+                if ($eligibleBookings->isNotEmpty()) {
+                    $canReview = true;
+                    $reviewableAfter = null;
+                } else {
+                    // Check if user has a future/ongoing confirmed booking (to show the countdown)
+                    $futureBooking = Bookings::where('user_id', $userId)
+                        ->where('status', 'confirmed')
+                        ->whereHas('showtime', function ($q) use ($movie) {
+                            $q->where('movie_id', $movie->id)
+                              ->where('end_time', '>', Carbon::now()); // showtime hasn't ended yet
+                        })
+                        ->with('showtime')
+                        ->get();
 
-                    $reviewableAfter = $latestEndTime;
-                    $canReview = Carbon::now()->greaterThanOrEqualTo($latestEndTime);
+                    if ($futureBooking->isNotEmpty()) {
+                        // Show unlock countdown: use the earliest upcoming end_time
+                        $reviewableAfter = $futureBooking->min(fn($b) => $b->showtime->end_time);
+                    }
                 }
             }
         }

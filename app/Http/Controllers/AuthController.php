@@ -26,13 +26,32 @@ class AuthController extends Controller
 
         if (Auth::attempt($request->only('email', 'password'))) {
             $user = Auth::user();
+
+            // Pending user → log them out, send a fresh OTP, redirect to verify
+            if ($user->status === 'pending') {
+                Auth::logout();
+
+                // Generate and save a fresh OTP
+                $otp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                $user->update([
+                    'otp'            => $otp,
+                    'otp_expires_at' => now()->addMinutes(10),
+                ]);
+
+                Mail::to($user->email)->send(new OtpMail($otp));
+                session(['otp_email' => $user->email]);
+
+                return redirect()->route('otp.show')
+                    ->with('success', 'A verification code has been sent to your email.');
+            }
+
             if ($user->role && $user->role->name === 'admin') {
                 return redirect('/admin/dashboard');
             }
             return redirect()->intended('/');
         }
 
-        return back()->withErrors(['email' => 'Invalid credentials']);
+        return back()->withErrors(['email' => 'Invalid credentials.']);
     }
 
     public function showRegister()
@@ -58,13 +77,13 @@ class AuthController extends Controller
             'email'          => $request->email,
             'password'       => Hash::make($request->password),
             'role_id'        => $customerRole->id,
+            'status'         => 'pending',
             'otp'            => $otp,
             'otp_expires_at' => now()->addMinutes(10),
         ]);
 
         Mail::to($user->email)->send(new OtpMail($otp));
 
-        // Pass email to OTP page via session
         session(['otp_email' => $user->email]);
 
         return redirect()->route('otp.show')->with('success', 'OTP sent to your email!');
@@ -87,24 +106,32 @@ class AuthController extends Controller
         $email = session('otp_email');
         $user  = User::where('email', $email)->first();
 
-        // Trim the OTP to remove any extra spaces
-        $enteredOtp = trim($request->otp);
-        $storedOtp = trim($user->otp ?? '');
+        if (!$user) {
+            return back()->withErrors(['otp' => 'Session expired. Please register again.']);
+        }
 
-        if (!$user || $storedOtp !== $enteredOtp) {
-            return back()->withErrors(['otp' => 'Invalid OTP.']);
+        $enteredOtp = (string) trim($request->otp);
+        $storedOtp  = (string) trim($user->otp ?? '');
+
+        if ($storedOtp === '' || $storedOtp !== $enteredOtp) {
+            return back()->withErrors(['otp' => 'Invalid OTP. Please try again.']);
         }
 
         if (now()->isAfter($user->otp_expires_at)) {
             return back()->withErrors(['otp' => 'OTP has expired. Please register again.']);
         }
 
-        // Clear OTP and log in
-        $user->update(['otp' => null, 'otp_expires_at' => null]);
+        // ✅ Clear OTP and activate the account
+        $user->update([
+            'otp'            => null,
+            'otp_expires_at' => null,
+            'status'         => 'active',
+        ]);
+
         Auth::login($user);
         session()->forget('otp_email');
 
-        return redirect('/')->with('success', 'Registration successful!');
+        return redirect('/')->with('success', 'Email verified! Welcome to CineMax.');
     }
 
     public function logout()

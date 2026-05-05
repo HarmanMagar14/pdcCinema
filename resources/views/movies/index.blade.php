@@ -237,18 +237,12 @@
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item {{ request('status') === 'now-showing' ? 'active' : '' }}" href="{{ route('movies.index', ['status' => 'now-showing']) }}">Now Showing</a></li>
                         <li><a class="dropdown-item {{ request('status') === 'coming-soon' ? 'active' : '' }}" href="{{ route('movies.index', ['status' => 'coming-soon']) }}">Coming Soon</a></li>
-                        <li><a class="dropdown-item {{ request()->routeIs('movies.index') && !request('status') ? 'active' : '' }}" href="{{ route('movies.index') }}">All Movies</a></li>
                     </ul>
                 </div>
                 @if(Auth::check())
                     <a class="nav-link" href="{{ route('bookings.index') }}">My Bookings</a>
                 @endif
             </div>
-
-            <form method="GET" action="{{ route('movies.index') }}" class="search-wrap d-flex align-items-center">
-                <i class="bi bi-search"></i>
-                <input type="search" name="search" value="{{ request('search') }}" placeholder="Search movies, genres…">
-            </form>
 
             <div class="navbar-user">
                 @include('partials.user-menu')
@@ -257,14 +251,12 @@
     </nav>
 
     <div class="container">
-        @if(request('search'))
-            <h1 class="page-title">Search results for "{{ request('search') }}"</h1>
-        @elseif(request('status') === 'now-showing')
+        @if(request('status') === 'now-showing')
             <h1 class="page-title">NOW SHOWING</h1>
         @elseif(request('status') === 'coming-soon')
             <h1 class="page-title">COMING SOON</h1>
         @else
-            <h1 class="page-title">ALL MOVIES</h1>
+            <h1 class="page-title">MOVIES</h1>
         @endif
         <div class="row g-4">
             @foreach($movies as $movie)

@@ -11,6 +11,7 @@ use App\Models\Movies;
 use App\Models\Genres;
 use App\Models\Cinemas;
 use App\Models\Halls;
+use App\Models\Seats;
 use App\Models\Showtimes;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -711,8 +712,8 @@ class AdminController extends Controller
     public function storeHall(Request $request)
     {
         $validated = $request->validate([
-            'cinema_id' => 'required|exists:cinemas,id',
-            'name' => [
+            'cinema_id'       => 'required|exists:cinemas,id',
+            'name'            => [
                 'required',
                 'string',
                 'max:50',
@@ -725,22 +726,27 @@ class AdminController extends Controller
                     }
                 },
             ],
-            'capacity' => 'required|integer|min:1',
-            'screen_type' => 'nullable|string|max:50',
-            'audio_system' => 'nullable|string|max:100',
-            'screen_dimensions' => 'nullable|string|max:50',
+            'capacity'        => 'required|integer|min:1|max:500',
             'projection_type' => 'required|in:2D,3D,IMAX',
         ]);
 
-        $hall = new Halls();
-        $hall->fill($validated);
-        $hall->save();
+        $hall = Halls::create([
+            'cinema_id'       => $validated['cinema_id'],
+            'name'            => $validated['name'],
+            'capacity'        => $validated['capacity'],
+            'projection_type' => $validated['projection_type'],
+        ]);
 
-        return back()->with('success', 'Hall created successfully');
+        // Auto-generate seats for the hall
+        $this->generateSeats($hall);
+
+        return back()->with('success', 'Hall "' . $hall->name . '" created with ' . $hall->capacity . ' seats.');
     }
 
     public function updateHall(Request $request, Halls $hall)
     {
+        $oldCapacity = $hall->capacity;
+
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -756,16 +762,54 @@ class AdminController extends Controller
                     }
                 },
             ],
-            'capacity' => 'required|integer|min:1',
-            'screen_type' => 'nullable|string|max:50',
-            'audio_system' => 'nullable|string|max:100',
-            'screen_dimensions' => 'nullable|string|max:50',
+            'capacity'        => 'required|integer|min:1|max:500',
             'projection_type' => 'required|in:2D,3D,IMAX',
         ]);
 
-        $hall->update($validated);
+        $hall->update([
+            'name'            => $validated['name'],
+            'capacity'        => $validated['capacity'],
+            'projection_type' => $validated['projection_type'],
+        ]);
 
-        return back()->with('success', 'Hall updated successfully');
+        // If capacity changed, regenerate all seats
+        if ((int)$validated['capacity'] !== (int)$oldCapacity) {
+            $hall->seats()->delete();
+            $this->generateSeats($hall);
+        }
+
+        return back()->with('success', 'Hall updated successfully.');
+    }
+
+    /**
+     * Generate seat rows for a hall based on its capacity.
+     * Layout: fill rows A, B, C… with up to 10 seats each.
+     * e.g. capacity=20 → A1–A10, B1–B10
+     *       capacity=15 → A1–A10, B1–B5
+     */
+    private function generateSeats(Halls $hall): void
+    {
+        $capacity    = $hall->capacity;
+        $seatsPerRow = 10;
+        $rows        = range('A', 'Z'); // up to 260 seats
+        $rowIndex    = 0;
+        $inserted    = 0;
+
+        while ($inserted < $capacity) {
+            $rowLabel    = $rows[$rowIndex] ?? chr(65 + $rowIndex); // fallback
+            $seatsInRow  = min($seatsPerRow, $capacity - $inserted);
+
+            for ($seatNum = 1; $seatNum <= $seatsInRow; $seatNum++) {
+                Seats::create([
+                    'hall_id'    => $hall->id,
+                    'row_number' => $rowLabel,
+                    'number'     => $seatNum,
+                ]);
+            }
+
+            $inserted += $seatsInRow;
+            $rowIndex++;
+        }
     }
 
     public function deleteHall(Halls $hall)
@@ -788,11 +832,42 @@ class AdminController extends Controller
         return response()->json($showtimes);
     }
 
+
     // BOOKINGS MANAGEMENT
     public function bookingsList(Request $request)
     {
-        // Placeholder - similar to users
-        return view('admin.bookings.index', ['bookings' => []]);
+        $query = Bookings::with([
+                'user',
+                'showtime.movie',
+                'showtime.hall.cinema',
+                'payment',
+                'bookings_seats',
+            ])
+            ->orderByDesc('id');
+
+        // Search by customer name or movie title
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', fn($u) => $u->where('name', 'like', "%{$search}%"))
+                  ->orWhereHas('showtime.movie', fn($m) => $m->where('title', 'like', "%{$search}%"));
+            });
+        }
+
+        // Filter by status
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        $bookings = $query->paginate(20)->withQueryString();
+
+        return view('admin.bookings.index', compact('bookings'));
+    }
+
+    public function updateBookingStatus(Request $request, Bookings $booking)
+    {
+        $request->validate(['status' => 'required|in:confirmed,pending,canceled']);
+        $booking->update(['status' => $request->status]);
+        return back()->with('success', "Booking #{$booking->id} status updated to {$request->status}.");
     }
 
     // SETTINGS

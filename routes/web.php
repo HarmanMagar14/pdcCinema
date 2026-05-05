@@ -57,6 +57,9 @@ Route::get('/register', [AuthController::class, 'showRegister'])->name('register
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show')->middleware('auth');
+Route::post('/profile/update', [ProfileController::class, 'update'])->name('profile.update')->middleware('auth');
+Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar')->middleware('auth');
+
 
 // ADMIN ROUTES
 Route::middleware(['auth', 'is_admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -101,4 +104,5 @@ Route::middleware(['auth', 'is_admin'])->prefix('admin')->name('admin.')->group(
     
     // Bookings Management
     Route::get('/bookings', [AdminController::class, 'bookingsList'])->name('bookings.index');
+    Route::patch('/bookings/{booking}/status', [AdminController::class, 'updateBookingStatus'])->name('bookings.update-status');
 });

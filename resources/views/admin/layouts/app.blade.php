@@ -581,6 +581,70 @@
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(240,239,244,0.15); }
 
+        /* ── FIX: Bootstrap classes that clash with dark theme ── */
+
+        /* text-muted: Bootstrap default is ~#6c757d which is invisible on dark bg */
+        .text-muted {
+            color: rgba(240,239,244,0.55) !important;
+        }
+
+        /* small helper text (used under inputs, etc.) */
+        small, .small {
+            color: rgba(240,239,244,0.5) !important;
+        }
+
+        /* bg-light: Bootstrap default is #f8f9fa (near-white) — breaks dark theme */
+        .bg-light {
+            background: var(--surface2) !important;
+        }
+
+        /* text-dark used inside bg-light contexts */
+        .text-dark { color: var(--text) !important; }
+
+        /* h1–h6 inside admin content should always be light */
+        .admin-content h1,
+        .admin-content h2,
+        .admin-content h3,
+        .admin-content h4,
+        .admin-content h5,
+        .admin-content h6 {
+            color: var(--text) !important;
+        }
+
+        /* paragraph text in admin content */
+        .admin-content p {
+            color: rgba(240,239,244,0.65) !important;
+        }
+
+        /* border-dashed utility used in empty-state cards */
+        .border-dashed {
+            border: 1px dashed rgba(240,239,244,0.12) !important;
+        }
+
+        /* ── MODALS (global dark override) ── */
+        .modal-content {
+            background: var(--surface) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 0.75rem !important;
+            color: var(--text) !important;
+        }
+        .modal-header {
+            background: var(--surface2) !important;
+            border-bottom: 1px solid var(--border) !important;
+            border-radius: 0.75rem 0.75rem 0 0 !important;
+        }
+        .modal-title { color: var(--text) !important; font-weight: 600; }
+        .modal-body  { background: var(--surface) !important; }
+        .modal-footer {
+            background: var(--surface2) !important;
+            border-top: 1px solid var(--border) !important;
+            border-radius: 0 0 0.75rem 0.75rem !important;
+        }
+        .modal .form-select option {
+            background: #1c1c21;
+            color: #f0eff4;
+        }
+
         /* ── RESPONSIVE ── */
         @media (max-width: 767.98px) {
             .admin-sidebar { transform: translateX(-100%); transition: transform 0.3s; }

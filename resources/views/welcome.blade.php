@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -755,18 +755,12 @@
                     <ul class="dropdown-menu">
                         <li><a class="dropdown-item" href="{{ route('movies.index', ['status' => 'now-showing']) }}">Now Showing</a></li>
                         <li><a class="dropdown-item" href="{{ route('movies.index', ['status' => 'coming-soon']) }}">Coming Soon</a></li>
-                        <li><a class="dropdown-item" href="{{ route('movies.index') }}">All Movies</a></li>
                     </ul>
                 </div>
                 @if(Auth::check())
                     <a href="{{ route('bookings.index') }}" class="btn btn-outline-light btn-sm">My Bookings</a>
                 @endif
             </div>
-
-            <form method="GET" action="{{ route('movies.index') }}" class="search-wrap d-flex align-items-center">
-                <i class="bi bi-search"></i>
-                <input type="search" name="search" value="{{ request('search') }}" placeholder="Search movies, genres…">
-            </form>
 
             <div class="navbar-user">
                 @include('partials.user-menu')
