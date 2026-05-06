@@ -2,16 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\Bookings;
-use App\Models\Bookings_seats;
 use App\Models\Cinemas;
 use App\Models\Genres;
 use App\Models\Halls;
-use App\Models\Movies;
-use App\Models\Payments;
 use App\Models\Roles;
 use App\Models\Seats;
-use App\Models\Showtimes;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -21,124 +16,99 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // Create roles
-        $adminRole = Roles::firstOrCreate(['name' => 'admin']);
+        // ── Roles ─────────────────────────────────────────────────────────────
+        $adminRole    = Roles::firstOrCreate(['name' => 'admin']);
         $customerRole = Roles::firstOrCreate(['name' => 'customer']);
 
-        // Create admin user
+        // ── Users ─────────────────────────────────────────────────────────────
         User::firstOrCreate(
             ['email' => 'admin@cinemax.com'],
             [
-                'name' => 'Admin User',
-                'password' => Hash::make('password'),
-                'role_id' => $adminRole->id,
-                'status' => 'active',
+                'name'         => 'Admin User',
+                'password'     => Hash::make('password'),
+                'role_id'      => $adminRole->id,
+                'status'       => 'active',
                 'avatar_color' => '#e8340a',
             ]
         );
 
-        // Create test customer
         User::firstOrCreate(
             ['email' => 'customer@cinemax.com'],
             [
-                'name' => 'Test Customer',
-                'password' => Hash::make('password'),
-                'role_id' => $customerRole->id,
-                'status' => 'active',
+                'name'         => 'Test Customer',
+                'password'     => Hash::make('password'),
+                'role_id'      => $customerRole->id,
+                'status'       => 'active',
                 'avatar_color' => '#ff6b35',
             ]
         );
 
-        // Create genres
-        $genres = [
-            ['name' => 'Action'],
-            ['name' => 'Adventure'],
-            ['name' => 'Comedy'],
-            ['name' => 'Drama'],
-            ['name' => 'Fantasy'],
-            ['name' => 'Horror'],
-            ['name' => 'Romance'],
-            ['name' => 'Sci-Fi'],
-            ['name' => 'Thriller'],
-            ['name' => 'Animation'],
+        // ── Genres ────────────────────────────────────────────────────────────
+        $genreNames = [
+            'Action', 'Adventure', 'Comedy', 'Drama', 'Fantasy',
+            'Horror', 'Romance', 'Sci-Fi', 'Thriller', 'Animation',
         ];
 
-        foreach ($genres as $genre) {
-            Genres::firstOrCreate($genre);
+        foreach ($genreNames as $name) {
+            Genres::firstOrCreate(['name' => $name]);
         }
 
-        // Create cinemas
-        $cinemas = [
+        // ── Cinemas ───────────────────────────────────────────────────────────
+        $cinemaData = [
             ['name' => 'CineMax Downtown', 'location' => '123 Main St, City Center'],
-            ['name' => 'CineMax Mall', 'location' => '456 Shopping Plaza, Mall Level 3'],
-            ['name' => 'CineMax Luxury', 'location' => '789 Premium Ave, Uptown'],
+            ['name' => 'CineMax Mall',     'location' => '456 Shopping Plaza, Mall Level 3'],
+            ['name' => 'CineMax Luxury',   'location' => '789 Premium Ave, Uptown'],
         ];
 
-        foreach ($cinemas as $cinema) {
+        foreach ($cinemaData as $cinema) {
             Cinemas::firstOrCreate($cinema);
         }
 
-        // Create halls for each cinema
+        // ── Halls (3 per cinema) ──────────────────────────────────────────────
         $cinemas = Cinemas::all();
         foreach ($cinemas as $cinema) {
             for ($i = 1; $i <= 3; $i++) {
                 Halls::firstOrCreate([
-                    'name' => "Hall {$i}",
+                    'name'      => "Hall {$i}",
                     'cinema_id' => $cinema->id,
-                    'capacity' => 100,
+                    'capacity'  => 100,
                 ]);
             }
         }
 
-        // Create seats for each hall (10x10 grid)
+        // ── Seats (10×10 grid per hall) ───────────────────────────────────────
         $halls = Halls::all();
         foreach ($halls as $hall) {
             for ($row = 1; $row <= 10; $row++) {
-                $rowLetter = chr(64 + $row); // A, B, C, etc.
+                $rowLetter = chr(64 + $row); // A–J
                 for ($number = 1; $number <= 10; $number++) {
                     Seats::firstOrCreate([
-                        'hall_id' => $hall->id,
+                        'hall_id'    => $hall->id,
                         'row_number' => $rowLetter,
-                        'number' => $number,
+                        'number'     => $number,
                     ]);
                 }
             }
         }
 
+        $this->command->info('✓ Roles, users, genres, cinemas, halls, and seats seeded.');
+
+        // ── Movies ────────────────────────────────────────────────────────────
+        // MoviesSeeder inserts both now-showing and coming-soon movies.
+        // Coming-soon movies have future release dates and NO showtimes.
         $this->call(MoviesSeeder::class);
 
-        // Create showtimes for movies
-        $movies = Movies::all();
-        $halls = Halls::all();
+        // ── Showtimes ─────────────────────────────────────────────────────────
+        // ShowtimesSeeder assigns exactly ONE movie per hall for a 2-week run.
+        // 3 screenings per day: 10:00 AM, 2:30 PM, 7:00 PM.
+        // Only now-showing movies (first 12) get hall assignments.
+        $this->call(ShowtimesSeeder::class);
 
-        foreach ($movies as $movie) {
-            // Create 2-3 showtimes per movie per hall
-            foreach ($halls->random(min(2, $halls->count())) as $hall) {
-                $startTime = now()->addDays(rand(0, 7))->setHour(rand(10, 22))->setMinute(0);
-                $endTime = $startTime->copy()->addMinutes($movie->duration);
-
-                // Set prices based on movie genre and popularity (Philippine Peso)
-                $basePrice = match($movie->genre->name) {
-                    'Action', 'Adventure', 'Sci-Fi', 'Fantasy' => rand(350, 450), // Blockbusters
-                    'Animation' => rand(300, 400), // Family movies
-                    'Drama', 'Romance', 'Comedy' => rand(250, 350), // Regular movies
-                    'Horror', 'Thriller' => rand(280, 380), // Genre movies
-                    default => rand(250, 350)
-                };
-
-                Showtimes::firstOrCreate([
-                    'movie_id' => $movie->id,
-                    'hall_id' => $hall->id,
-                    'start_time' => $startTime,
-                    'end_time' => $endTime,
-                    'price' => $basePrice,
-                ]);
-            }
-        }
+        $this->command->info('');
+        $this->command->info('✓ Database seeding complete.');
+        $this->command->info('  Admin login:    admin@cinemax.com / password');
+        $this->command->info('  Customer login: customer@cinemax.com / password');
     }
 }

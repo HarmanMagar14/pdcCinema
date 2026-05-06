@@ -13,24 +13,21 @@ use App\Http\Controllers\Admin\AdminController;
 use App\Models\Movies;
 
 Route::get('/', function () {
-    $movies = Movies::with(['genre', 'showtime'])
+    // Now showing — movies that have at least one showtime from today onward
+    $movies = Movies::with(['genre', 'showtimes'])
         ->withAvg('reviews', 'rating')
         ->withCount('reviews')
-        ->whereHas('showtime', function($q) {
-            $q->whereDate('start_time', Carbon::today());
+        ->whereHas('showtimes', function ($q) {
+            $q->whereDate('start_time', '>=', Carbon::today());
         })
-        ->take(8)
+        ->take(12)
         ->get();
 
-    $comingSoonMovies = Movies::with(['genre', 'showtime'])
-        ->whereHas('showtime', function($q) {
-            $q->whereDate('start_time', '>', Carbon::today());
-        })
-        ->orderBy(
-            \App\Models\Showtimes::select('start_time')
-                ->whereColumn('movies.show_time_id', 'showtimes.id')
-                ->limit(1)
-        )
+    // Coming soon — movies that have NO showtimes (not yet scheduled)
+    // These populate the hero carousel
+    $comingSoonMovies = Movies::with(['genre'])
+        ->whereDoesntHave('showtimes')
+        ->orderBy('release_date', 'asc')
         ->take(5)
         ->get();
 
