@@ -5,7 +5,7 @@
     @endphp
     <div class="dropdown">
         <button
-            class="btn btn-outline-light btn-sm d-flex align-items-center gap-2 dropdown-toggle"
+            class="btn btn-danger btn-sm d-flex align-items-center gap-2 dropdown-toggle"
             type="button"
             data-bs-toggle="dropdown"
             aria-expanded="false"
@@ -17,17 +17,18 @@
             <span class="d-none d-md-inline">{{ $name }}</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end" style="font-family: 'DM Sans', sans-serif; font-size: 0.88rem;">
-            <li><a class="dropdown-item" href="{{ route('profile.show') }}" style="font-family: inherit;"><i class="bi bi-person-circle me-2"></i>Profile</a></li>
+            <li><a class="dropdown-item" href="{{ route('profile.show') }}"><i class="bi bi-person-circle me-2"></i>Profile</a></li>
             <li><hr class="dropdown-divider"></li>
             <li>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button type="submit" class="dropdown-item" style="font-family: inherit;"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
+                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
                 </form>
             </li>
         </ul>
     </div>
 @else
-    <a href="{{ route('login') }}" class="btn btn-outline-light btn-sm me-2">Login</a>
-    <a href="{{ route('register') }}" class="btn btn-light btn-sm">Register</a>
+    {{-- Changed btn-outline-light to btn-outline-danger and btn-light to btn-danger --}}
+    <a href="{{ route('login') }}" class="btn btn-outline-danger btn-sm me-2">Login</a>
+    <a href="{{ route('register') }}" class="btn btn-danger btn-sm">Register</a>
 @endif

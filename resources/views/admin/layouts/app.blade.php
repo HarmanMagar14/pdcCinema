@@ -662,9 +662,9 @@
     <div class="admin-topbar">
         <span class="topbar-page-title">@yield('title', 'Dashboard')</span>
         <div class="topbar-right">
-            <a href="{{ url('/') }}" class="topbar-view-site">
+            <!--<a href="{{ url('/') }}" class="topbar-view-site">
                 <i class="bi bi-box-arrow-up-right"></i> View Site
-            </a>
+            </a>-->
             <div class="topbar-user">
                 <div class="topbar-avatar"><i class="bi bi-person"></i></div>
                 <span class="user-name">{{ auth()->user()->name ?? 'Admin' }}</span>
