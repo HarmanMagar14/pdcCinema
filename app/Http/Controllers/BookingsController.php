@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\BookingConfirmationMail;
 use App\Models\Bookings;
 use App\Models\Bookings_seats;
 use App\Models\Payments;
@@ -10,6 +11,7 @@ use App\Models\Showtimes;
 use App\Services\PayMongoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class BookingsController extends Controller
 {
@@ -259,8 +261,16 @@ class BookingsController extends Controller
                 );
             }
 
-            $booking->load('tickets.seat');
-            return redirect()->route('bookings.show', $booking)->with('success', 'Payment successful! Your tickets have been generated.');
+            $booking->load('showtime.movie', 'showtime.hall.cinema', 'bookings_seats.seat', 'payment', 'tickets.seat', 'user');
+
+            // Send booking confirmation email with QR codes
+            try {
+                Mail::to($booking->user->email)->send(new BookingConfirmationMail($booking));
+            } catch (\Exception $e) {
+                Log::warning('Failed to send booking confirmation email', ['booking_id' => $booking->id, 'error' => $e->getMessage()]);
+            }
+
+            return redirect()->route('bookings.show', $booking)->with('success', 'Payment successful! Your tickets have been sent to your email.');
         }
 
         $sessionData   = $response['data'];
@@ -294,8 +304,16 @@ class BookingsController extends Controller
                 );
             }
 
-            $booking->load('tickets.seat');
-            return redirect()->route('bookings.show', $booking)->with('success', 'Payment successful! Your tickets have been generated.');
+            $booking->load('showtime.movie', 'showtime.hall.cinema', 'bookings_seats.seat', 'payment', 'tickets.seat', 'user');
+
+            // Send booking confirmation email with QR codes
+            try {
+                Mail::to($booking->user->email)->send(new BookingConfirmationMail($booking));
+            } catch (\Exception $e) {
+                Log::warning('Failed to send booking confirmation email', ['booking_id' => $booking->id, 'error' => $e->getMessage()]);
+            }
+
+            return redirect()->route('bookings.show', $booking)->with('success', 'Payment successful! Your tickets have been sent to your email.');
         }
 
         return redirect()->route('bookings.show', $booking)
