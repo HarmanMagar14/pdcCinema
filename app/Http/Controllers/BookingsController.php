@@ -35,13 +35,26 @@ class BookingsController extends Controller
     {
         $showtimeId = $request->query('showtime');
         $showtime = \App\Models\Showtimes::with('hall.seats', 'movie')->findOrFail($showtimeId);
+
+        // Redirect immediately if the showtime has already ended
+        if ($showtime->end_time <= now()) {
+            return redirect()->route('movies.show', $showtime->movie_id)
+                ->with('error', 'Sorry, this screening has already ended. Please choose an upcoming showtime.');
+        }
+
         $seats = $showtime->hall->seats;
 
-        // Get already booked seats for this showtime
+        // Get already booked seats for this showtime.
+        // Only count seats as booked if the showtime has NOT ended yet.
+        // Once end_time passes the movie is over and all seats reset automatically.
         $bookedSeatIds = Bookings_seats::whereHas('booking', function ($query) use ($showtimeId) {
             $query->where('showtime_id', $showtimeId)
                 ->whereHas('payment', function ($paymentQuery) {
                     $paymentQuery->where('status', 'paid');
+                })
+                ->whereHas('showtime', function ($showtimeQuery) {
+                    // Only treat as booked if the showtime is still ongoing or in the future
+                    $showtimeQuery->where('end_time', '>', now());
                 });
         })->pluck('seat_id')->toArray();
 
@@ -57,6 +70,15 @@ class BookingsController extends Controller
         ]);
 
         $showtime = Showtimes::findOrFail($request->showtime_id);
+
+        // ── Ended showtime guard ─────────────────────────────────────────────────────
+        // Prevent booking a showtime that has already finished.
+        if ($showtime->end_time <= now()) {
+            return back()->withErrors([
+                'showtime_id' => 'This screening has already ended. Please choose an upcoming showtime.'
+            ]);
+        }
+        // ── End ended showtime guard ─────────────────────────────────────────────────
 
         // ── Overlap check ────────────────────────────────────────────────────────────
         // Prevent booking a showtime that overlaps another one already running
@@ -74,12 +96,17 @@ class BookingsController extends Controller
         }
         // ── End overlap check ────────────────────────────────────────────────────────
 
-        // Check if any selected seats are already booked for this showtime
+        // Check if any selected seats are already booked for this showtime.
+        // Only count seats as booked if the showtime has NOT ended yet
+        // (mirrors the same filter in create() so visuals match validation).
         $bookedSeats = Bookings_seats::whereIn('seat_id', $request->seats)
             ->whereHas('booking', function ($query) use ($request) {
                 $query->where('showtime_id', $request->showtime_id)
                     ->whereHas('payment', function ($paymentQuery) {
                         $paymentQuery->where('status', 'paid');
+                    })
+                    ->whereHas('showtime', function ($showtimeQuery) {
+                        $showtimeQuery->where('end_time', '>', now());
                     });
             })
             ->with('seat')

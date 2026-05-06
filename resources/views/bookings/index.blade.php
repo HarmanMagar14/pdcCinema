@@ -80,9 +80,19 @@
         .seat-chip { display: inline-block; margin: 0 0.25rem 0.25rem 0; padding: 0.4rem 0.7rem; border-radius: 999px; background: rgba(240,239,244,0.08); color: var(--text); border: 1px solid rgba(240,239,244,0.08); }
         .btn-action { background: var(--accent); color: white; border: none; padding: 0.65rem 1.1rem; border-radius: 0.5rem; font-weight: 600; text-decoration: none; transition: background 0.2s; }
         .btn-action:hover { background: #c42908; }
-        .badge-pending { color: #ffcb6b; }
+        .badge-pending   { color: #ffcb6b; }
         .badge-confirmed { color: #4add8a; }
-        .badge-canceled { color: #ff6b6b; }
+        .badge-canceled  { color: #ff6b6b; }
+        .badge-finished  {
+            background: rgba(255,255,255,0.06);
+            color: rgba(240,239,244,0.45);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .booking-card.is-finished {
+            opacity: 0.72;
+            border-color: rgba(240,239,244,0.05);
+        }
+        .booking-card.is-finished h2 { color: var(--muted); }
         .alert { background: rgba(232,52,10,0.1); border: 1px solid rgba(232,52,10,0.3); color: var(--accent); border-radius: 0.5rem; padding: 0.9rem 1rem; margin-bottom: 1.5rem; }
     </style>
 </head>
@@ -127,12 +137,26 @@
         </div>
     @else
         @foreach($bookings as $booking)
-            <div class="booking-card">
+            @php
+            $isFinished = $booking->showtime->end_time->isPast();
+        @endphp
+        <div class="booking-card {{ $isFinished ? 'is-finished' : '' }}">
                 <h2>{{ $booking->showtime->movie->title }}</h2>
                 <div class="booking-meta">
                     <span><i class="bi bi-calendar-event"></i> {{ $booking->showtime->start_time->format('M j, Y g:i A') }}</span>
                     <span><i class="bi bi-building"></i> {{ $booking->showtime->hall->cinema->name }} - {{ $booking->showtime->hall->name }}</span>
-                    <span class="tag">{{ strtoupper($booking->status) }}</span>
+
+                    {{-- Status badge --}}
+                    @if($isFinished && $booking->status === 'confirmed')
+                        <span class="tag badge-finished">
+                            <i class="bi bi-film"></i> Movie Finished
+                        </span>
+                    @else
+                        <span class="tag {{ $booking->status === 'confirmed' ? 'badge-confirmed' : ($booking->status === 'canceled' ? 'badge-canceled' : 'badge-pending') }}">
+                            {{ strtoupper($booking->status) }}
+                        </span>
+                    @endif
+
                     <span class="tag {{ $booking->payment->status === 'pending' ? 'badge-pending' : ($booking->payment->status === 'canceled' ? 'badge-canceled' : 'badge-confirmed') }}">Payment: {{ ucfirst($booking->payment->status) }}</span>
                     @if($booking->tickets->isNotEmpty())
                         <span class="tag badge-confirmed"><i class="bi bi-ticket-perforated"></i> {{ $booking->tickets->count() }} Ticket{{ $booking->tickets->count() === 1 ? '' : 's' }}</span>
@@ -146,20 +170,22 @@
                 <div class="d-flex gap-3 flex-wrap align-items-center">
                     <span class="tag">Total: ₱{{ number_format($booking->payment->amount, 0) }}</span>
                     <a href="{{ route('bookings.show', $booking) }}" class="btn-action">View Details</a>
-                    @if($booking->payment->status === 'pending')
-                        <form method="POST" action="{{ route('bookings.pay', $booking) }}">
-                            @csrf
-                            <button type="submit" class="btn-action">Pay Now</button>
-                        </form>
-                        <form method="POST" action="{{ route('bookings.cancel', $booking) }}">
-                            @csrf
-                            <button type="submit" class="btn-action" style="background: #444;">Cancel Booking</button>
-                        </form>
-                    @elseif($booking->status !== 'canceled')
-                        <form method="POST" action="{{ route('bookings.cancel', $booking) }}">
-                            @csrf
-                            <button type="submit" class="btn-action" style="background: #444;">Cancel Booking</button>
-                        </form>
+                    @if(!$isFinished)
+                        @if($booking->payment->status === 'pending')
+                            <form method="POST" action="{{ route('bookings.pay', $booking) }}">
+                                @csrf
+                                <button type="submit" class="btn-action">Pay Now</button>
+                            </form>
+                            <form method="POST" action="{{ route('bookings.cancel', $booking) }}">
+                                @csrf
+                                <button type="submit" class="btn-action" style="background: #444;">Cancel Booking</button>
+                            </form>
+                        @elseif($booking->status !== 'canceled')
+                            <form method="POST" action="{{ route('bookings.cancel', $booking) }}">
+                                @csrf
+                                <button type="submit" class="btn-action" style="background: #444;">Cancel Booking</button>
+                            </form>
+                        @endif
                     @endif
                 </div>
             </div>

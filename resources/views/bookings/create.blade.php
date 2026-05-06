@@ -334,9 +334,12 @@
     <div class="container">
         <h1 class="page-title">BOOK SEATS</h1>
 
-        @if ($errors->has('seats'))
-            <div style="background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.3); color: #ff6b6b; padding: 1rem; border-radius: 0.5rem; margin-bottom: 2rem;">
-                <i class="bi bi-exclamation-triangle"></i> {{ $errors->first('seats') }}
+        @if ($errors->any())
+            <div style="background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.3); color: #ff6b6b; padding: 1rem 1.25rem; border-radius: 0.5rem; margin-bottom: 2rem;">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                @foreach ($errors->all() as $error)
+                    <div>{{ $error }}</div>
+                @endforeach
             </div>
         @endif
 

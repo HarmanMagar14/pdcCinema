@@ -6,7 +6,8 @@
     <title>Booking Confirmation - CineMax</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.0/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
         :root {
@@ -191,6 +192,155 @@
             font-size: 0.8rem;
         }
 
+        /* ── TICKET STUB ── */
+        .tickets-section { margin-bottom: 2rem; }
+        .tickets-section h3 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.6rem;
+            letter-spacing: 1px;
+            color: var(--text);
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .ticket-stub {
+            background: linear-gradient(135deg, #1a1a22 0%, #111115 100%);
+            border: 1px solid rgba(232,52,10,0.25);
+            border-radius: 1rem;
+            overflow: hidden;
+            margin-bottom: 1.25rem;
+            display: flex;
+            position: relative;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(232,52,10,0.08);
+        }
+        /* Left accent stripe */
+        .ticket-stub::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom, var(--accent), var(--accent2));
+            border-radius: 4px 0 0 4px;
+        }
+        /* Perforated divider */
+        .ticket-divider {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding: 0 0.5rem;
+        }
+        .ticket-divider::before {
+            content: '';
+            position: absolute;
+            top: -1px; bottom: -1px;
+            width: 1px;
+            background: repeating-linear-gradient(
+                to bottom,
+                rgba(232,52,10,0.35) 0px,
+                rgba(232,52,10,0.35) 6px,
+                transparent 6px,
+                transparent 12px
+            );
+        }
+        .ticket-divider .notch {
+            width: 20px; height: 20px;
+            background: var(--bg);
+            border-radius: 50%;
+            border: 1px solid rgba(232,52,10,0.2);
+            z-index: 1;
+        }
+        .ticket-divider .notch-top { margin-bottom: auto; margin-top: -10px; }
+        .ticket-divider .notch-bot { margin-top: auto;  margin-bottom: -10px; }
+
+        /* Main body */
+        .ticket-body {
+            flex: 1;
+            padding: 1.4rem 1.4rem 1.4rem 1.8rem;
+        }
+        .ticket-movie {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.35rem;
+            letter-spacing: 1px;
+            color: var(--text);
+            margin-bottom: 0.25rem;
+        }
+        .ticket-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            margin-bottom: 1rem;
+        }
+        .ticket-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+        .ticket-seat-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(232,52,10,0.18);
+            border: 1px solid rgba(232,52,10,0.4);
+            color: var(--accent2);
+            font-weight: 700;
+            font-size: 1rem;
+            border-radius: 0.5rem;
+            padding: 0.4rem 0.9rem;
+            margin-bottom: 0.85rem;
+        }
+        .ticket-code-label {
+            font-size: 0.7rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 0.25rem;
+        }
+        .ticket-code {
+            font-family: 'Courier Prime', 'Courier New', monospace;
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--gold);
+            letter-spacing: 2px;
+            background: rgba(245,197,24,0.08);
+            border: 1px solid rgba(245,197,24,0.2);
+            border-radius: 0.4rem;
+            padding: 0.3rem 0.75rem;
+            display: inline-block;
+        }
+
+        /* QR side */
+        .ticket-qr {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem 1.4rem;
+            gap: 0.5rem;
+            min-width: 130px;
+        }
+        .ticket-qr-box {
+            background: #fff;
+            border-radius: 0.5rem;
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .ticket-qr-box canvas,
+        .ticket-qr-box img { display: block; border-radius: 0.3rem; }
+        .ticket-qr-label {
+            font-size: 0.65rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--muted);
+            text-align: center;
+        }
+
         /* ── DROPDOWN ── */
         .dropdown-menu {
             background: var(--surface2);
@@ -304,15 +454,50 @@
             </div>
 
             @if(!$isCanceled && $booking->tickets->isNotEmpty())
-                <div style="background: var(--surface2); border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 2rem;">
-                    <h3 style="margin-bottom: 1rem; font-size: 1.2rem;">Your Tickets</h3>
+                <div class="tickets-section">
+                    <h3><i class="bi bi-ticket-perforated-fill" style="color:var(--accent);"></i> Your Tickets</h3>
                     @foreach($booking->tickets as $ticket)
-                        <div style="background: rgba(232,52,10,0.1); border: 1px solid rgba(232,52,10,0.3); border-radius: 0.5rem; padding: 1rem; margin-bottom: 0.75rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                                <div>
-                                    <strong style="color: var(--accent);">Seat {{ $ticket->seat->row_number }}{{ $ticket->seat->number }}</strong>
+                        <div class="ticket-stub">
+                            {{-- Main ticket body --}}
+                            <div class="ticket-body">
+                                <div class="ticket-movie">{{ $booking->showtime->movie->title }}</div>
+                                <div class="ticket-meta">
+                                    <span class="ticket-meta-item">
+                                        <i class="bi bi-calendar-event"></i>
+                                        {{ $booking->showtime->start_time->format('M j, Y') }}
+                                    </span>
+                                    <span class="ticket-meta-item">
+                                        <i class="bi bi-clock"></i>
+                                        {{ $booking->showtime->start_time->format('g:i A') }}
+                                    </span>
+                                    <span class="ticket-meta-item">
+                                        <i class="bi bi-building"></i>
+                                        {{ $booking->showtime->hall->cinema->name }} &mdash; {{ $booking->showtime->hall->name }}
+                                    </span>
                                 </div>
-                                <div style="background: #222; padding: 0.5rem 1rem; border-radius: 0.4rem; font-family: 'Courier New', monospace; font-size: 1.1rem; font-weight: bold; color: var(--gold);">{{ $ticket->code }}</div>
+                                <div class="ticket-seat-badge">
+                                    <i class="bi bi-grid-3x3"></i>
+                                    Seat {{ $ticket->seat->row_number }}{{ $ticket->seat->number }}
+                                </div>
+                                <div class="ticket-code-label">Ticket Number</div>
+                                <div class="ticket-code">{{ $ticket->code }}</div>
+                            </div>
+
+                            {{-- Perforated divider --}}
+                            <div class="ticket-divider">
+                                <div class="notch notch-top"></div>
+                                <div class="notch notch-bot"></div>
+                            </div>
+
+                            {{-- QR Code side --}}
+                            <div class="ticket-qr">
+                                <div class="ticket-qr-box"
+                                     id="qr-{{ $ticket->id }}"
+                                     data-code="{{ $ticket->code }}"
+                                     data-seat="{{ $ticket->seat->row_number }}{{ $ticket->seat->number }}"
+                                     data-movie="{{ $booking->showtime->movie->title }}">
+                                </div>
+                                <div class="ticket-qr-label">Scan to verify</div>
                             </div>
                         </div>
                     @endforeach
@@ -330,5 +515,23 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Generate QR codes for every ticket
+        document.querySelectorAll('[id^="qr-"]').forEach(function(el) {
+            const code  = el.dataset.code;
+            const seat  = el.dataset.seat;
+            const movie = el.dataset.movie;
+            // Encode a JSON payload so the QR contains useful info
+            const payload = JSON.stringify({ ticket: code, seat: seat, movie: movie });
+            new QRCode(el, {
+                text: payload,
+                width: 110,
+                height: 110,
+                colorDark: '#111115',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.M
+            });
+        });
+    </script>
 </body>
 </html>

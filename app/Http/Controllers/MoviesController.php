@@ -20,7 +20,7 @@ class MoviesController extends Controller
         $search = request('search');
         $status = request('status');
 
-        $query = Movies::with('genre')
+        $query = Movies::with('genre', 'nextShowtime')
             ->withAvg('reviews', 'rating')
             ->withCount('reviews');
 
@@ -69,6 +69,7 @@ class MoviesController extends Controller
      */
     public function show(Movies $movie)
     {
+        $now = \Carbon\Carbon::now();
         $showtimes = $movie->showtimes()->with('hall.cinema')->get();
         
         // Only show cinemas that have showtimes for this movie
@@ -145,7 +146,12 @@ class MoviesController extends Controller
         $hallToShowtime = $showtimes
             ->filter(fn($showtime) => $showtime->hall)
             ->groupBy(fn($showtime) => (string)$showtime->hall->id)
-            ->map(fn($hallShowtimes) => optional($hallShowtimes->sortBy('start_time')->first())->id)
+            ->map(function ($hallShowtimes) use ($now) {
+                // Prefer the earliest upcoming/active showtime; fall back to the last past one
+                $upcoming = $hallShowtimes->filter(fn($s) => $s->end_time > $now)->sortBy('start_time');
+                $chosen   = $upcoming->first() ?? $hallShowtimes->sortByDesc('start_time')->first();
+                return optional($chosen)->id;
+            })
             ->all();
 
         return view('movies.show', compact(

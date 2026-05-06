@@ -20,6 +20,16 @@ class Movies extends Model
         return $this->belongsTo(Showtimes::class, 'show_time_id');
     }
 
+    /**
+     * The next upcoming (not yet ended) showtime for this movie, ordered soonest first.
+     */
+    public function nextShowtime()
+    {
+        return $this->hasOne(Showtimes::class, 'movie_id')
+            ->where('end_time', '>', now())
+            ->orderBy('start_time');
+    }
+
     public function genre()
     {
         return $this->belongsTo(Genres::class, 'genre_id');
